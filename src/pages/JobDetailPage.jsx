@@ -15,7 +15,7 @@ import {
   Upload,
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
-import { jobs } from "../components/job/JobList";
+import { sampleJobs } from "../components/job/JobList";
 
 // Helper function to format salary
 const formatSalary = (min, max, currency = "INR") => {
@@ -43,12 +43,10 @@ const JobDetailPage = () => {
   const navigate = useNavigate();
   const [isApplying, setIsApplying] = useState(false);
   const [coverLetter, setCoverLetter] = useState("");
-  const [resume, setResume] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasApplied, setHasApplied] = useState(false);
   const [alreadyApplied] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [uploadError, setUploadError] = useState("");
 
   useEffect(() => {
     // Check if user is logged in
@@ -58,7 +56,20 @@ const JobDetailPage = () => {
     }
   }, []);
 
-  const job = jobs.find((j) => j.id === parseInt(id));
+  const getAllJobs = () => {
+    const localJobs = JSON.parse(localStorage.getItem("jobs") || "[]");
+    // Combine localStorage jobs and sample jobs, avoiding duplicate IDs
+    const allJobs = [...localJobs];
+    const localJobIds = new Set(localJobs.map(j => String(j.id)));
+    for (const job of sampleJobs) {
+      if (!localJobIds.has(String(job.id))) {
+        allJobs.push(job);
+      }
+    }
+    return allJobs;
+  };
+  const jobs = getAllJobs();
+  const job = jobs.find((j) => String(j.id) === String(id));
 
   const handleApplyClick = () => {
     // Check if user is logged in
@@ -79,52 +90,15 @@ const JobDetailPage = () => {
     setIsApplying(true);
   };
 
-  const handleResumeChange = (e) => {
-    const file = e.target.files[0];
-    setUploadError("");
-    
-    if (!file) {
-      setResume(null);
-      return;
-    }
-
-    // Validate file type
-    const allowedTypes = [
-      "application/pdf",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ];
-    
-    if (!allowedTypes.includes(file.type)) {
-      setUploadError("Please upload a PDF or Word document (.pdf, .doc, .docx)");
-      e.target.value = ""; // Clear the input
-      setResume(null);
-      return;
-    }
-
-    // Validate file size (5MB limit)
-    const maxSize = 5 * 1024 * 1024; // 5MB in bytes
-    if (file.size > maxSize) {
-      setUploadError("File size must be less than 5MB");
-      e.target.value = ""; // Clear the input
-      setResume(null);
-      return;
-    }
-
-    setResume(file);
-    setUploadError("");
-  };
-
   const handleApplySubmit = async (e) => {
     e.preventDefault();
 
-    if (!resume) {
-      setUploadError("Please upload your resume");
+    if (!coverLetter) {
+      alert("Please write a cover letter");
       return;
     }
 
     setIsSubmitting(true);
-    setUploadError("");
 
     try {
       // Simulate API call
@@ -135,41 +109,46 @@ const JobDetailPage = () => {
       console.log("Application submitted:", {
         jobId: job.id,
         userId: currentUser.id,
-        resume: resume.name,
         coverLetter: coverLetter,
         submittedAt: new Date().toISOString()
       });
+
+      // --- Add application to recruiterJobs ---
+      const recruiterJobs = JSON.parse(localStorage.getItem("recruiterJobs") || "[]");
+      const jobIdx = recruiterJobs.findIndex(j => j.id === job.id || j.id === String(job.id));
+      if (jobIdx !== -1) {
+        recruiterJobs[jobIdx].applicants = recruiterJobs[jobIdx].applicants || [];
+        recruiterJobs[jobIdx].applicants.push({
+          userId: currentUser.id,
+          name: currentUser.name,
+          email: currentUser.email,
+          coverLetter,
+          appliedAt: new Date().toISOString()
+        });
+        localStorage.setItem("recruiterJobs", JSON.stringify(recruiterJobs));
+      }
+      // --- Add application to jobs (for candidate view) ---
+      const jobsList = JSON.parse(localStorage.getItem("jobs") || "[]");
+      const jobIdx2 = jobsList.findIndex(j => j.id === job.id || j.id === String(job.id));
+      if (jobIdx2 !== -1) {
+        jobsList[jobIdx2].applicants = jobsList[jobIdx2].applicants || [];
+        jobsList[jobIdx2].applicants.push({
+          userId: currentUser.id,
+          name: currentUser.name,
+          email: currentUser.email,
+          coverLetter,
+          appliedAt: new Date().toISOString()
+        });
+        localStorage.setItem("jobs", JSON.stringify(jobsList));
+      }
 
       setHasApplied(true);
       setIsSubmitting(false);
       setIsApplying(false);
     } catch (error) {
       console.error("Error submitting application:", error);
-      setUploadError("Failed to submit application. Please try again.");
+      alert("Failed to submit application. Please try again.");
       setIsSubmitting(false);
-    }
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      const file = files[0];
-      // Create a synthetic event object
-      const syntheticEvent = {
-        target: {
-          files: [file],
-          value: ""
-        }
-      };
-      handleResumeChange(syntheticEvent);
     }
   };
 
@@ -418,78 +397,6 @@ const JobDetailPage = () => {
                       className="block text-sm font-medium text-gray-700 mb-2"
                       data-oid="zgsje4w"
                     >
-                      Resume *
-                    </label>
-                    <div
-                      className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-gray-400 transition-colors"
-                      onDragOver={handleDragOver}
-                      onDrop={handleDrop}
-                      data-oid="x0er4fx"
-                    >
-                      <div className="space-y-1 text-center" data-oid="1eymf76">
-                        <Upload
-                          className="mx-auto h-12 w-12 text-gray-400"
-                          data-oid="8nvrubz"
-                        />
-                        <div
-                          className="flex text-sm text-gray-600"
-                          data-oid="dw60_9e"
-                        >
-                          <label
-                            htmlFor="resume-upload"
-                            className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
-                            data-oid="zd8vjyb"
-                          >
-                            <span data-oid="8d.lobd">Upload your resume</span>
-                            <input
-                              id="resume-upload"
-                              name="resume-upload"
-                              type="file"
-                              className="sr-only"
-                              accept=".pdf,.doc,.docx"
-                              onChange={handleResumeChange}
-                              data-oid="em_dsdr"
-                            />
-                          </label>
-                          <p className="pl-1" data-oid="81_7i5g">
-                            or drag and drop
-                          </p>
-                        </div>
-                        <p className="text-xs text-gray-500" data-oid="mj2yds1">
-                          PDF, DOC, DOCX up to 5MB
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {/* Error Message */}
-                    {uploadError && (
-                      <div className="mt-2 text-sm text-red-600 flex items-center">
-                        <span className="mr-1">⚠️</span>
-                        {uploadError}
-                      </div>
-                    )}
-                    
-                    {/* Success Message */}
-                    {resume && !uploadError && (
-                      <div
-                        className="mt-2 text-sm text-green-600 flex items-center"
-                        data-oid="9zs-n.o"
-                      >
-                        <CheckCircle2
-                          className="h-4 w-4 mr-1"
-                          data-oid="q823l9r"
-                        />
-                        {resume.name} ({(resume.size / 1024 / 1024).toFixed(2)}{" "}
-                        MB)
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mb-4" data-oid="36l3jfh">
-                    <label
-                      className="block text-sm font-medium text-gray-700 mb-1"
-                      data-oid="mhonxdh"
-                    >
                       Cover Letter (Optional)
                     </label>
                     <textarea
@@ -504,7 +411,7 @@ const JobDetailPage = () => {
                     <Button
                       type="submit"
                       className="flex-1"
-                      disabled={isSubmitting || !resume}
+                      disabled={isSubmitting || !coverLetter}
                       data-oid="vvz.eqk"
                     >
                       {isSubmitting ? "Submitting..." : "Submit Application"}
@@ -515,9 +422,7 @@ const JobDetailPage = () => {
                       className="flex-1"
                       onClick={() => {
                         setIsApplying(false);
-                        setResume(null);
                         setCoverLetter("");
-                        setUploadError("");
                       }}
                       data-oid="j1-j4z."
                     >

@@ -1,7 +1,7 @@
 import React from "react";
 import JobCard from "./JobCard";
 
-const jobs = [
+const sampleJobs = [
   {
     id: 1,
     title: "Frontend Developer",
@@ -267,7 +267,22 @@ const jobs = [
   },
 ];
 
+const getJobs = () => {
+  const localJobs = JSON.parse(localStorage.getItem("jobs") || "[]");
+  // Combine localStorage jobs and sample jobs, avoiding duplicate IDs
+  const allJobs = [...localJobs];
+  const localJobIds = new Set(localJobs.map(j => j.id));
+  for (const job of sampleJobs) {
+    if (!localJobIds.has(job.id)) {
+      allJobs.push(job);
+    }
+  }
+  return allJobs;
+};
+
 const JobList = ({ searchQuery, filters, limit }) => {
+  const jobs = getJobs();
+
   const getSalaryRange = (salaryString) => {
     const cleanString = salaryString.replace(/[₹,]/g, "");
     const numbers = cleanString.match(/\d+/g).map(Number);
@@ -377,5 +392,5 @@ const JobList = ({ searchQuery, filters, limit }) => {
   );
 };
 
-export { jobs };
+export { sampleJobs };
 export default JobList;

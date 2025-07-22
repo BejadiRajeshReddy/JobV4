@@ -49,8 +49,20 @@ const ProfilePage = () => {
     }
     
     const userData = JSON.parse(user);
-    setCurrentUser(userData);
-    setEditData(userData);
+
+    // Try to load full profile from userProfiles
+    const userProfiles = JSON.parse(localStorage.getItem("userProfiles") || "{}");
+    const fullProfile = userProfiles[userData.id];
+
+    if (fullProfile) {
+      setCurrentUser(fullProfile);
+      setEditData(fullProfile);
+      console.log("[Profile Load] Loaded fullProfile from userProfiles:", fullProfile);
+    } else {
+      setCurrentUser(userData);
+      setEditData(userData);
+      console.log("[Profile Load] Loaded userData from currentUser:", userData);
+    }
   }, [navigate]);
 
   const handleSave = () => {
@@ -65,6 +77,20 @@ const ProfilePage = () => {
     );
     localStorage.setItem("users", JSON.stringify(updatedUsers));
     
+    // --- Update userProfiles for recruiter/candidate full view ---
+    const userProfiles = JSON.parse(localStorage.getItem("userProfiles") || "{}");
+    userProfiles[editData.id] = {
+      ...userProfiles[editData.id],
+      ...editData,
+      experience: editData.experience || [],
+      education: editData.education || [],
+      skills: editData.skills || [],
+      projects: editData.projects || [],
+      profilePicture: editData.profilePhoto ? { url: editData.profilePhoto } : null,
+      // add any other fields you want to persist for recruiter/candidate view
+    };
+    localStorage.setItem("userProfiles", JSON.stringify(userProfiles));
+
     // Dispatch event to update navbar
     window.dispatchEvent(new Event('userStateChanged'));
   };
@@ -75,6 +101,27 @@ const ProfilePage = () => {
     setProfilePhoto(null);
     setCoverPhoto(null);
     setResumeFile(null);
+  };
+
+  // Helper to save to userProfiles with robust ID handling and logging
+  const saveToUserProfiles = (newData) => {
+    const userProfiles = JSON.parse(localStorage.getItem("userProfiles") || "{}");
+    const id = newData.id || (currentUser && currentUser.id);
+    if (!id) {
+      console.warn("No user ID found for saving profile", newData);
+      return;
+    }
+    userProfiles[id] = {
+      ...userProfiles[id],
+      ...newData,
+      experience: newData.experience || [],
+      education: newData.education || [],
+      skills: newData.skills || [],
+      projects: newData.projects || [],
+      profilePicture: newData.profilePhoto ? { url: newData.profilePhoto } : null,
+    };
+    localStorage.setItem("userProfiles", JSON.stringify(userProfiles));
+    console.log("[saveToUserProfiles] Saved for ID:", id, userProfiles[id]);
   };
 
   // Photo upload handlers
@@ -98,8 +145,10 @@ const ProfilePage = () => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const photoUrl = e.target.result;
+        const newEditData = { ...editData, profilePhoto: photoUrl };
         setProfilePhoto(photoUrl);
-        setEditData({ ...editData, profilePhoto: photoUrl });
+        setEditData(newEditData);
+        saveToUserProfiles(newEditData);
       };
       reader.readAsDataURL(file);
     }
@@ -166,16 +215,20 @@ const ProfilePage = () => {
   const addSkill = () => {
     const newSkill = prompt("Enter a skill:");
     if (newSkill && newSkill.trim()) {
-      setEditData({
+      const newEditData = {
         ...editData,
         skills: [...(editData.skills || []), newSkill.trim()]
-      });
+      };
+      setEditData(newEditData);
+      saveToUserProfiles(newEditData);
     }
   };
 
   const removeSkill = (index) => {
     const updatedSkills = editData.skills.filter((_, i) => i !== index);
-    setEditData({ ...editData, skills: updatedSkills });
+    const newEditData = { ...editData, skills: updatedSkills };
+    setEditData(newEditData);
+    saveToUserProfiles(newEditData);
   };
 
   const addExperience = () => {
@@ -189,22 +242,28 @@ const ProfilePage = () => {
       current: false,
       description: ""
     };
-    setEditData({
+    const newEditData = {
       ...editData,
       experience: [...(editData.experience || []), newExp]
-    });
+    };
+    setEditData(newEditData);
+    saveToUserProfiles(newEditData);
   };
 
   const updateExperience = (index, field, value) => {
     const updatedExp = editData.experience.map((exp, i) => 
       i === index ? { ...exp, [field]: value } : exp
     );
-    setEditData({ ...editData, experience: updatedExp });
+    const newEditData = { ...editData, experience: updatedExp };
+    setEditData(newEditData);
+    saveToUserProfiles(newEditData);
   };
 
   const removeExperience = (index) => {
     const updatedExp = editData.experience.filter((_, i) => i !== index);
-    setEditData({ ...editData, experience: updatedExp });
+    const newEditData = { ...editData, experience: updatedExp };
+    setEditData(newEditData);
+    saveToUserProfiles(newEditData);
   };
 
   const addEducation = () => {
@@ -218,22 +277,28 @@ const ProfilePage = () => {
       current: false,
       gpa: ""
     };
-    setEditData({
+    const newEditData = {
       ...editData,
       education: [...(editData.education || []), newEdu]
-    });
+    };
+    setEditData(newEditData);
+    saveToUserProfiles(newEditData);
   };
 
   const updateEducation = (index, field, value) => {
     const updatedEdu = editData.education.map((edu, i) => 
       i === index ? { ...edu, [field]: value } : edu
     );
-    setEditData({ ...editData, education: updatedEdu });
+    const newEditData = { ...editData, education: updatedEdu };
+    setEditData(newEditData);
+    saveToUserProfiles(newEditData);
   };
 
   const removeEducation = (index) => {
     const updatedEdu = editData.education.filter((_, i) => i !== index);
-    setEditData({ ...editData, education: updatedEdu });
+    const newEditData = { ...editData, education: updatedEdu };
+    setEditData(newEditData);
+    saveToUserProfiles(newEditData);
   };
 
   const getProfileCompleteness = () => {

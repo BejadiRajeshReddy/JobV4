@@ -63,6 +63,7 @@ const RecruiterDashboard = () => {
     benefits: "",
     deadline: ""
   });
+  const [profileModal, setProfileModal] = useState({ open: false, profile: null });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -139,6 +140,20 @@ const RecruiterDashboard = () => {
     }
 
     localStorage.setItem("recruiterJobs", JSON.stringify(allJobs));
+    
+    // ALSO save to jobs for candidates to see
+    const allPublicJobs = JSON.parse(localStorage.getItem("jobs") || "[]");
+    if (editingJob) {
+      // Update existing job in jobs array
+      const idx = allPublicJobs.findIndex(job => job.id === newJob.id);
+      if (idx !== -1) {
+        allPublicJobs[idx] = newJob;
+      }
+    } else {
+      allPublicJobs.push(newJob);
+    }
+    localStorage.setItem("jobs", JSON.stringify(allPublicJobs));
+    
     loadJobs(currentUser.id);
     resetForm();
   };
@@ -220,6 +235,12 @@ const RecruiterDashboard = () => {
       .map((n) => n[0])
       .join("")
       .toUpperCase() || "U";
+  };
+
+  // Helper to fetch candidate profile from localStorage
+  const getCandidateProfile = (userId) => {
+    const profiles = JSON.parse(localStorage.getItem("userProfiles") || "{}");
+    return profiles[userId] || null;
   };
 
   if (!currentUser) {
@@ -384,7 +405,7 @@ const RecruiterDashboard = () => {
                   <p className="text-gray-600">Create, edit, and manage your job postings</p>
                 </div>
                 <Button
-                  // onClick={() => setShowJobForm(true)}
+                  onClick={() => setShowJobForm(true)}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
                 >
                   <Plus className="w-5 h-5 mr-2" />
@@ -554,16 +575,171 @@ const RecruiterDashboard = () => {
 
         {activeTab === 'applications' && (
           <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8">
-            <div className="text-center py-12">
-              <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Applications Management</h3>
-              <p className="text-gray-600">
-                View and manage job applications from candidates
-              </p>
-              <p className="text-sm text-gray-500 mt-2">
-                This feature will be available soon
-              </p>
-            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-6">Applications Management</h3>
+            {jobs.length === 0 ? (
+              <div className="text-center py-12">
+                <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Jobs Posted</h3>
+                <p className="text-gray-600">Post a job to start receiving applications.</p>
+              </div>
+            ) : jobs.every(job => !job.applicants || job.applicants.length === 0) ? (
+              <div className="text-center py-12">
+                <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Applications Yet</h3>
+                <p className="text-gray-600">You haven't received any applications yet.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase tracking-wider">Job Title</th>
+                      <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase tracking-wider">Applicant Name</th>
+                      <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase tracking-wider">Email</th>
+                      <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase tracking-wider">Applied At</th>
+                      <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase tracking-wider">Profile</th>
+                      <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase tracking-wider">Cover Letter</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {jobs.map(job => (
+                      (job.applicants || []).map((app, idx) => (
+                        <tr key={job.id + '-' + (app.userId || idx)}>
+                          <td className="px-4 py-2 font-semibold text-gray-900 whitespace-nowrap">{job.title}</td>
+                          <td className="px-4 py-2 whitespace-nowrap">{app.name}</td>
+                          <td className="px-4 py-2 whitespace-nowrap">{app.email}</td>
+                          <td className="px-4 py-2 whitespace-nowrap">{app.appliedAt ? new Date(app.appliedAt).toLocaleString() : ''}</td>
+                          <td className="px-4 py-2 whitespace-nowrap">
+                            <button
+                              className="text-blue-600 hover:underline"
+                              onClick={() => {
+                                const profile = getCandidateProfile(app.userId);
+                                setProfileModal({ open: true, profile });
+                              }}
+                              disabled={!app.userId}
+                            >
+                              View Profile
+                            </button>
+                          </td>
+                          <td className="px-4 py-2 max-w-xs truncate" title={app.coverLetter}>{app.coverLetter ? app.coverLetter : 'N/A'}</td>
+                        </tr>
+                      ))
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Profile Modal */}
+            {profileModal.open && profileModal.profile && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8 relative overflow-y-auto max-h-[90vh]">
+                  <button
+                    className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-xl"
+                    onClick={() => setProfileModal({ open: false, profile: null })}
+                  >
+                    &times;
+                  </button>
+                  <div className="flex flex-col items-center mb-6">
+                    {profileModal.profile.profilePicture?.url ? (
+                      <img src={profileModal.profile.profilePicture.url} alt="Profile" className="w-28 h-28 rounded-full object-cover border-4 border-blue-200 mb-2" />
+                    ) : (
+                      <div className="w-28 h-28 rounded-full bg-blue-100 flex items-center justify-center text-3xl font-bold text-blue-600 mb-2">
+                        {profileModal.profile.fullName?.[0] || 'U'}
+                      </div>
+                    )}
+                    <h2 className="text-2xl font-bold mb-1">{profileModal.profile.fullName || profileModal.profile.name || 'N/A'}</h2>
+                    <p className="text-gray-600 mb-1">{profileModal.profile.jobTitle || 'N/A'}</p>
+                    <div className="flex flex-wrap gap-4 text-gray-500 text-sm mb-2">
+                      <span>{profileModal.profile.email || 'N/A'}</span>
+                      {profileModal.profile.phone && <span>{profileModal.profile.phone}</span>}
+                      {profileModal.profile.location && <span>{profileModal.profile.location}</span>}
+                    </div>
+                  </div>
+                  {/* Social Links */}
+                  <div className="mb-4">
+                    <h3 className="font-semibold text-lg mb-2">Social Links</h3>
+                    <div className="flex flex-wrap gap-4">
+                      {profileModal.profile.socialLinks?.linkedin && <a href={profileModal.profile.socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">LinkedIn</a>}
+                      {profileModal.profile.socialLinks?.github && <a href={profileModal.profile.socialLinks.github} target="_blank" rel="noopener noreferrer" className="text-gray-800 hover:underline">GitHub</a>}
+                      {profileModal.profile.socialLinks?.portfolio && <a href={profileModal.profile.socialLinks.portfolio} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline">Portfolio</a>}
+                      {profileModal.profile.socialLinks?.website && <a href={profileModal.profile.socialLinks.website} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">Website</a>}
+                      {!(profileModal.profile.socialLinks?.linkedin || profileModal.profile.socialLinks?.github || profileModal.profile.socialLinks?.portfolio || profileModal.profile.socialLinks?.website) && <span className="text-gray-400">No social links</span>}
+                    </div>
+                  </div>
+                  {/* About Me */}
+                  <div className="mb-4">
+                    <h3 className="font-semibold text-lg mb-2">About Me</h3>
+                    <p className="text-gray-700 whitespace-pre-line">{profileModal.profile.aboutMe || 'N/A'}</p>
+                  </div>
+                  {/* Experience */}
+                  <div className="mb-4">
+                    <h3 className="font-semibold text-lg mb-2">Experience</h3>
+                    {Array.isArray(profileModal.profile.experience) && profileModal.profile.experience.length > 0 ? (
+                      <ul className="space-y-2">
+                        {profileModal.profile.experience.map((exp, i) => (
+                          <li key={i} className="border-b pb-2">
+                            <div className="font-semibold">{exp.title || 'N/A'} <span className="text-blue-600">@ {exp.company || 'N/A'}</span></div>
+                            <div className="text-sm text-gray-500">{exp.location ? exp.location + ', ' : ''}{exp.startDate} - {exp.current ? 'Present' : exp.endDate}</div>
+                            {exp.description && <div className="text-gray-700 text-sm mt-1">{exp.description}</div>}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : <div className="text-gray-400">No experience added</div>}
+                  </div>
+                  {/* Education */}
+                  <div className="mb-4">
+                    <h3 className="font-semibold text-lg mb-2">Education</h3>
+                    {Array.isArray(profileModal.profile.education) && profileModal.profile.education.length > 0 ? (
+                      <ul className="space-y-2">
+                        {profileModal.profile.education.map((edu, i) => (
+                          <li key={i} className="border-b pb-2">
+                            <div className="font-semibold">{edu.degree || 'N/A'} <span className="text-green-600">@ {edu.institution || 'N/A'}</span></div>
+                            <div className="text-sm text-gray-500">{edu.location ? edu.location + ', ' : ''}{edu.startDate} - {edu.current ? 'Present' : edu.endDate}</div>
+                            {edu.gpa && <div className="text-xs text-gray-500">GPA: {edu.gpa}</div>}
+                            {edu.description && <div className="text-gray-700 text-sm mt-1">{edu.description}</div>}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : <div className="text-gray-400">No education added</div>}
+                  </div>
+                  {/* Skills */}
+                  <div className="mb-4">
+                    <h3 className="font-semibold text-lg mb-2">Skills</h3>
+                    {Array.isArray(profileModal.profile.skills) && profileModal.profile.skills.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {profileModal.profile.skills.map((s, i) => (
+                          <span key={i} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">{s.name || s}</span>
+                        ))}
+                      </div>
+                    ) : <div className="text-gray-400">No skills added</div>}
+                  </div>
+                  {/* Projects */}
+                  <div className="mb-4">
+                    <h3 className="font-semibold text-lg mb-2">Projects</h3>
+                    {Array.isArray(profileModal.profile.projects) && profileModal.profile.projects.length > 0 ? (
+                      <ul className="space-y-2">
+                        {profileModal.profile.projects.map((proj, i) => (
+                          <li key={i} className="border-b pb-2">
+                            <div className="font-semibold">{proj.title || 'N/A'}</div>
+                            <div className="text-sm text-gray-500">{proj.startDate} - {proj.current ? 'Present' : proj.endDate}</div>
+                            {proj.technologies && <div className="text-xs text-gray-500">Tech: {Array.isArray(proj.technologies) ? proj.technologies.join(', ') : proj.technologies}</div>}
+                            {proj.githubUrl && <a href={proj.githubUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs">GitHub</a>}
+                            {proj.liveUrl && <a href={proj.liveUrl} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline text-xs ml-2">Live</a>}
+                            {proj.description && <div className="text-gray-700 text-sm mt-1">{proj.description}</div>}
+                            {proj.highlights && Array.isArray(proj.highlights) && proj.highlights.length > 0 && (
+                              <ul className="list-disc ml-5 text-xs text-gray-600 mt-1">
+                                {proj.highlights.map((h, j) => <li key={j}>{h}</li>)}
+                              </ul>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : <div className="text-gray-400">No projects added</div>}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
