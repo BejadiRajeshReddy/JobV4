@@ -53,7 +53,9 @@ const Login = () => {
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       const users = JSON.parse(localStorage.getItem("users") || "[]");
-      const user = users.find((u) => u.email === email);
+      const user = users.find(
+        (u) => u.email === email || (u.company && u.company.email === email)
+      );
 
       if (!user || user.password !== password) {
         throw new Error("Invalid email or password");

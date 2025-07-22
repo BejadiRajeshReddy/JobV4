@@ -431,7 +431,7 @@ const RecruiterDashboard = () => {
                   </p>
                   {jobs.length === 0 && (
                     <Button
-                      // onClick={() => setShowJobForm(true)}
+                      onClick={() => setShowJobForm(true)}
                       className="bg-blue-600 hover:bg-blue-700 text-white"
                     >
                       <Plus className="w-5 h-5 mr-2" />
